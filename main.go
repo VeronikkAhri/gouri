@@ -35,6 +35,13 @@ func usage() {
 	fmt.Println("  gouri edit FILE          # open file in $EDITOR")
 	fmt.Println("  gouri env KEY            # print environment variable")
 	fmt.Println("  gouri env set KEY VAL    # persist environment variable")
+	fmt.Println("  gouri free               # show memory usage")
+	fmt.Println("  gouri ps                 # list running processes")
+	fmt.Println("  gouri compress OUT FILES # create a tar.gz archive")
+	fmt.Println("  gouri extract ARCH DIR   # extract a tar.gz archive")
+	fmt.Println("  gouri whoami             # show current user")
+	fmt.Println("  gouri date               # show date and time")
+	fmt.Println("  gouri net                # show network interfaces")
 }
 
 func runCommand(name string, args ...string) error {
@@ -218,6 +225,35 @@ func setEnv(key, value string) error {
 	return err
 }
 
+func showMemory() error {
+	return runCommand("free", "-h")
+}
+
+func listProcesses() error {
+	return runCommand("ps", "aux")
+}
+
+func compressFiles(out string, files []string) error {
+	args := append([]string{"-czf", out}, files...)
+	return runCommand("tar", args...)
+}
+
+func extractArchive(archive, dir string) error {
+	return runCommand("tar", "-xzf", archive, "-C", dir)
+}
+
+func showUser() error {
+	return runCommand("whoami")
+}
+
+func showDate() error {
+	return runCommand("date")
+}
+
+func showNetwork() error {
+	return runCommand("ip", "addr")
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -382,6 +418,42 @@ func main() {
 			}
 		default:
 			showEnv(os.Args[2])
+		}
+	case "free":
+		if err := showMemory(); err != nil {
+			fmt.Println("free error:", err)
+		}
+	case "ps":
+		if err := listProcesses(); err != nil {
+			fmt.Println("ps error:", err)
+		}
+	case "compress":
+		if len(os.Args) < 4 {
+			usage()
+			return
+		}
+		if err := compressFiles(os.Args[2], os.Args[3:]); err != nil {
+			fmt.Println("compress error:", err)
+		}
+	case "extract":
+		if len(os.Args) < 4 {
+			usage()
+			return
+		}
+		if err := extractArchive(os.Args[2], os.Args[3]); err != nil {
+			fmt.Println("extract error:", err)
+		}
+	case "whoami":
+		if err := showUser(); err != nil {
+			fmt.Println("whoami error:", err)
+		}
+	case "date":
+		if err := showDate(); err != nil {
+			fmt.Println("date error:", err)
+		}
+	case "net":
+		if err := showNetwork(); err != nil {
+			fmt.Println("net error:", err)
 		}
 	default:
 		usage()

@@ -35,6 +35,13 @@ go build
 ./gouri edit FILE          # open file in $EDITOR
 ./gouri env KEY            # print environment variable
 ./gouri env set KEY VAL    # persist environment variable
+./gouri free               # show memory usage
+./gouri ps                 # list running processes
+./gouri compress OUT FILES # create a tar.gz archive
+./gouri extract ARCH DIR   # extract a tar.gz archive
+./gouri whoami             # show current user
+./gouri date               # show date and time
+./gouri net                # show network interfaces
 ```
 
 The shell configuration file is detected based on the `SHELL` environment
