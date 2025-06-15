@@ -20,6 +20,15 @@ go build
 ./gouri alias remove NAME  # remove alias from your shell config
 ./gouri view FILE          # print file contents
 ./gouri remove FILE        # delete a file
+./gouri list DIR           # list directory contents
+./gouri copy SRC DST       # copy a file
+./gouri move SRC DST       # move or rename a file
+./gouri search FILE TERM   # search for TERM inside FILE
+./gouri disk               # show disk usage
+./gouri ping HOST          # ping a host
+./gouri tree DIR           # show directory tree
+./gouri create FILE        # create an empty file
+./gouri lines FILE         # count lines in a file
 ```
 
 The shell configuration file is detected based on the `SHELL` environment
