@@ -44,3 +44,4 @@ variable. For `zsh` it uses `~/.zshrc` and defaults to `~/.bashrc`.
 
 Administrative commands such as update and upgrade require `sudo` privileges.
 Ensure your user has the appropriate permissions.
+=======
