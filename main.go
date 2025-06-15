@@ -1,0 +1,660 @@
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+)
+
+func usage() {
+	fmt.Println("Gouri - simple assistant")
+	fmt.Println("Usage:")
+	fmt.Println("  gouri update             # run system update")
+	fmt.Println("  gouri upgrade            # run system upgrade")
+	fmt.Println("  gouri alias add name cmd # create an alias")
+	fmt.Println("  gouri alias remove name  # remove an alias")
+	fmt.Println("  gouri view FILE          # view file contents")
+	fmt.Println("  gouri remove FILE        # remove a file")
+	fmt.Println("  gouri list DIR           # list directory contents")
+	fmt.Println("  gouri copy SRC DST       # copy a file")
+	fmt.Println("  gouri move SRC DST       # move/rename a file")
+	fmt.Println("  gouri search FILE TERM   # search term in file")
+	fmt.Println("  gouri disk               # show disk usage")
+	fmt.Println("  gouri ping HOST          # ping a network host")
+	fmt.Println("  gouri tree DIR           # show directory tree")
+	fmt.Println("  gouri create FILE        # create an empty file")
+	fmt.Println("  gouri lines FILE         # count lines in file")
+	fmt.Println("  gouri alias list         # list defined aliases")
+	fmt.Println("  gouri mkdir DIR          # create a directory")
+	fmt.Println("  gouri uptime             # show system uptime")
+	fmt.Println("  gouri edit FILE          # open file in $EDITOR")
+	fmt.Println("  gouri env KEY            # print environment variable")
+	fmt.Println("  gouri env set KEY VAL    # persist environment variable")
+	fmt.Println("  gouri free               # show memory usage")
+	fmt.Println("  gouri ps                 # list running processes")
+	fmt.Println("  gouri compress OUT FILES # create a tar.gz archive")
+	fmt.Println("  gouri extract ARCH DIR   # extract a tar.gz archive")
+	fmt.Println("  gouri whoami             # show current user")
+	fmt.Println("  gouri date               # show date and time")
+	fmt.Println("  gouri net                # show network interfaces")
+	fmt.Println("  gouri hostname           # print host name")
+	fmt.Println("  gouri calc EXPR          # evaluate expression")
+	fmt.Println("  gouri open PATH          # open file or directory")
+	fmt.Println("  gouri download URL FILE  # download URL to FILE")
+	fmt.Println("  gouri serve DIR PORT     # start http server")
+	fmt.Println("  gouri uuid               # generate a UUID")
+	fmt.Println("  gouri checksum FILE      # SHA256 of FILE")
+	fmt.Println("  gouri sysinfo            # show OS and arch")
+	fmt.Println("  gouri clear              # clear the screen")
+}
+
+func runCommand(name string, args ...string) error {
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		psArgs := append([]string{"-Command", name}, args...)
+		cmd = exec.Command("powershell", psArgs...)
+	} else {
+		cmd = exec.Command(name, args...)
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func shellConfig() string {
+	shell := os.Getenv("SHELL")
+	base := filepath.Base(shell)
+	switch base {
+	case "zsh":
+		return filepath.Join(os.Getenv("HOME"), ".zshrc")
+	default:
+		return filepath.Join(os.Getenv("HOME"), ".bashrc")
+	}
+}
+
+func addAlias(name, command string) error {
+	file := shellConfig()
+	f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = fmt.Fprintf(f, "\nalias %s='%s'\n", name, command)
+	return err
+}
+
+func removeAlias(name string) error {
+	file := shellConfig()
+	input, err := os.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(input), "\n")
+	var out []string
+	for _, line := range lines {
+		if strings.HasPrefix(line, "alias "+name+"=") {
+			continue
+		}
+		out = append(out, line)
+	}
+	return os.WriteFile(file, []byte(strings.Join(out, "\n")), 0644)
+}
+
+func viewFile(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		fmt.Println(scanner.Text())
+	}
+	return scanner.Err()
+}
+
+func listDir(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		fmt.Println(e.Name())
+	}
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Sync()
+}
+
+func moveFile(src, dst string) error {
+	return os.Rename(src, dst)
+}
+
+func searchInFile(path, term string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	lineNum := 1
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, term) {
+			fmt.Printf("%d: %s\n", lineNum, line)
+		}
+		lineNum++
+	}
+	return scanner.Err()
+}
+
+func createFile(path string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+func countLines(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	count := 0
+	for scanner.Scan() {
+		count++
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	fmt.Println(count)
+	return nil
+}
+
+func listAliases() error {
+	data, err := os.ReadFile(shellConfig())
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "alias ") {
+			fmt.Println(line)
+		}
+	}
+	return scanner.Err()
+}
+
+func makeDir(path string) error {
+	return os.MkdirAll(path, 0755)
+}
+
+func showUptime() error {
+	if runtime.GOOS == "windows" {
+		return runCommand("Get-Uptime")
+	}
+	return runCommand("uptime")
+}
+
+func editFile(path string) error {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = "nano"
+	}
+	return runCommand(editor, path)
+}
+
+func showEnv(key string) {
+	fmt.Println(os.Getenv(key))
+}
+
+func setEnv(key, value string) error {
+	file := shellConfig()
+	f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = fmt.Fprintf(f, "\nexport %s=%q\n", key, value)
+	return err
+}
+
+func showMemory() error {
+	if runtime.GOOS == "windows" {
+		return runCommand("Get-CimInstance", "Win32_OperatingSystem")
+	}
+	return runCommand("free", "-h")
+}
+
+func listProcesses() error {
+	if runtime.GOOS == "windows" {
+		return runCommand("Get-Process")
+	}
+	return runCommand("ps", "aux")
+}
+
+func compressFiles(out string, files []string) error {
+	args := append([]string{"-czf", out}, files...)
+	return runCommand("tar", args...)
+}
+
+func extractArchive(archive, dir string) error {
+	return runCommand("tar", "-xzf", archive, "-C", dir)
+}
+
+func showUser() error {
+	return runCommand("whoami")
+}
+
+func showDate() error {
+	return runCommand("date")
+}
+
+func showNetwork() error {
+	if runtime.GOOS == "windows" {
+		return runCommand("Get-NetIPAddress")
+	}
+	return runCommand("ip", "addr")
+}
+
+func showHostname() error {
+	name, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	fmt.Println(name)
+	return nil
+}
+
+func calcExpr(expr string) error {
+	if runtime.GOOS == "windows" {
+		return runCommand("Write-Output", fmt.Sprintf("(%s)", expr))
+	}
+	return runCommand("bash", "-c", fmt.Sprintf("echo '%s' | bc -l", expr))
+}
+
+func openPath(path string) error {
+	switch runtime.GOOS {
+	case "windows":
+		return runCommand("Start-Process", path)
+	case "darwin":
+		return runCommand("open", path)
+	default:
+		return runCommand("xdg-open", path)
+	}
+}
+
+func downloadFile(url, out string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	f, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, resp.Body)
+	return err
+}
+
+func serveDir(dir, port string) error {
+	fs := http.FileServer(http.Dir(dir))
+	http.Handle("/", fs)
+	return http.ListenAndServe(":"+port, nil)
+}
+
+func newUUID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:]), nil
+}
+
+func checksumFile(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+	sum := h.Sum(nil)
+	fmt.Println(hex.EncodeToString(sum))
+	return nil
+}
+
+func showSysInfo() {
+	fmt.Printf("%s %s\n", runtime.GOOS, runtime.GOARCH)
+}
+
+func clearScreen() error {
+	if runtime.GOOS == "windows" {
+		return runCommand("cls")
+	}
+	return runCommand("clear")
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		usage()
+		return
+	}
+
+	switch os.Args[1] {
+	case "update":
+		if runtime.GOOS == "windows" {
+			if err := runCommand("winget", "upgrade"); err != nil {
+				fmt.Println("update error:", err)
+			}
+		} else {
+			if err := runCommand("sudo", "apt-get", "update"); err != nil {
+				fmt.Println("update error:", err)
+			}
+		}
+	case "upgrade":
+		if runtime.GOOS == "windows" {
+			if err := runCommand("winget", "upgrade", "--all"); err != nil {
+				fmt.Println("upgrade error:", err)
+			}
+		} else {
+			if err := runCommand("sudo", "apt-get", "upgrade", "-y"); err != nil {
+				fmt.Println("upgrade error:", err)
+			}
+		}
+	case "alias":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		switch os.Args[2] {
+		case "add":
+			if len(os.Args) < 5 {
+				usage()
+				return
+			}
+			if err := addAlias(os.Args[3], strings.Join(os.Args[4:], " ")); err != nil {
+				fmt.Println("alias add error:", err)
+			}
+		case "remove":
+			if len(os.Args) < 4 {
+				usage()
+				return
+			}
+			if err := removeAlias(os.Args[3]); err != nil {
+				fmt.Println("alias remove error:", err)
+			}
+		case "list":
+			if err := listAliases(); err != nil {
+				fmt.Println("alias list error:", err)
+			}
+		default:
+			usage()
+		}
+	case "view":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := viewFile(os.Args[2]); err != nil {
+			fmt.Println("view error:", err)
+		}
+	case "remove":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := os.Remove(os.Args[2]); err != nil {
+			fmt.Println("remove error:", err)
+		}
+	case "list":
+		dir := "."
+		if len(os.Args) >= 3 {
+			dir = os.Args[2]
+		}
+		if err := listDir(dir); err != nil {
+			fmt.Println("list error:", err)
+		}
+	case "copy":
+		if len(os.Args) < 4 {
+			usage()
+			return
+		}
+		if err := copyFile(os.Args[2], os.Args[3]); err != nil {
+			fmt.Println("copy error:", err)
+		}
+	case "move":
+		if len(os.Args) < 4 {
+			usage()
+			return
+		}
+		if err := moveFile(os.Args[2], os.Args[3]); err != nil {
+			fmt.Println("move error:", err)
+		}
+	case "search":
+		if len(os.Args) < 4 {
+			usage()
+			return
+		}
+		if err := searchInFile(os.Args[2], os.Args[3]); err != nil {
+			fmt.Println("search error:", err)
+		}
+	case "disk":
+		if runtime.GOOS == "windows" {
+			if err := runCommand("Get-PSDrive"); err != nil {
+				fmt.Println("disk error:", err)
+			}
+		} else {
+			if err := runCommand("df", "-h"); err != nil {
+				fmt.Println("disk error:", err)
+			}
+		}
+	case "ping":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if runtime.GOOS == "windows" {
+			if err := runCommand("ping", "-n", "4", os.Args[2]); err != nil {
+				fmt.Println("ping error:", err)
+			}
+		} else if err := runCommand("ping", "-c", "4", os.Args[2]); err != nil {
+			fmt.Println("ping error:", err)
+		}
+	case "tree":
+		dir := "."
+		if len(os.Args) >= 3 {
+			dir = os.Args[2]
+		}
+		if err := runCommand("tree", dir); err != nil {
+			fmt.Println("tree error:", err)
+		}
+	case "create":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := createFile(os.Args[2]); err != nil {
+			fmt.Println("create error:", err)
+		}
+	case "lines":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := countLines(os.Args[2]); err != nil {
+			fmt.Println("lines error:", err)
+		}
+	case "mkdir":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := makeDir(os.Args[2]); err != nil {
+			fmt.Println("mkdir error:", err)
+		}
+	case "uptime":
+		if err := showUptime(); err != nil {
+			fmt.Println("uptime error:", err)
+		}
+	case "edit":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := editFile(os.Args[2]); err != nil {
+			fmt.Println("edit error:", err)
+		}
+	case "env":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		switch os.Args[2] {
+		case "set":
+			if len(os.Args) < 5 {
+				usage()
+				return
+			}
+			if err := setEnv(os.Args[3], os.Args[4]); err != nil {
+				fmt.Println("env set error:", err)
+			}
+		default:
+			showEnv(os.Args[2])
+		}
+	case "free":
+		if err := showMemory(); err != nil {
+			fmt.Println("free error:", err)
+		}
+	case "ps":
+		if err := listProcesses(); err != nil {
+			fmt.Println("ps error:", err)
+		}
+	case "compress":
+		if len(os.Args) < 4 {
+			usage()
+			return
+		}
+		if err := compressFiles(os.Args[2], os.Args[3:]); err != nil {
+			fmt.Println("compress error:", err)
+		}
+	case "extract":
+		if len(os.Args) < 4 {
+			usage()
+			return
+		}
+		if err := extractArchive(os.Args[2], os.Args[3]); err != nil {
+			fmt.Println("extract error:", err)
+		}
+	case "whoami":
+		if err := showUser(); err != nil {
+			fmt.Println("whoami error:", err)
+		}
+	case "date":
+		if err := showDate(); err != nil {
+			fmt.Println("date error:", err)
+		}
+	case "net":
+		if err := showNetwork(); err != nil {
+			fmt.Println("net error:", err)
+		}
+	case "hostname":
+		if err := showHostname(); err != nil {
+			fmt.Println("hostname error:", err)
+		}
+	case "calc":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := calcExpr(strings.Join(os.Args[2:], " ")); err != nil {
+			fmt.Println("calc error:", err)
+		}
+	case "open":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := openPath(os.Args[2]); err != nil {
+			fmt.Println("open error:", err)
+		}
+	case "download":
+		if len(os.Args) < 4 {
+			usage()
+			return
+		}
+		if err := downloadFile(os.Args[2], os.Args[3]); err != nil {
+			fmt.Println("download error:", err)
+		}
+	case "serve":
+		dir := "."
+		port := "8080"
+		if len(os.Args) >= 3 {
+			dir = os.Args[2]
+		}
+		if len(os.Args) >= 4 {
+			port = os.Args[3]
+		}
+		if err := serveDir(dir, port); err != nil {
+			fmt.Println("serve error:", err)
+		}
+	case "uuid":
+		id, err := newUUID()
+		if err != nil {
+			fmt.Println("uuid error:", err)
+			break
+		}
+		fmt.Println(id)
+	case "checksum":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := checksumFile(os.Args[2]); err != nil {
+			fmt.Println("checksum error:", err)
+		}
+	case "sysinfo":
+		showSysInfo()
+	case "clear":
+		if err := clearScreen(); err != nil {
+			fmt.Println("clear error:", err)
+		}
+	default:
+		usage()
+	}
+}
