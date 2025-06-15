@@ -29,6 +29,12 @@ go build
 ./gouri tree DIR           # show directory tree
 ./gouri create FILE        # create an empty file
 ./gouri lines FILE         # count lines in a file
+./gouri alias list         # list existing aliases
+./gouri mkdir DIR          # create a directory
+./gouri uptime             # show system uptime
+./gouri edit FILE          # open file in $EDITOR
+./gouri env KEY            # print environment variable
+./gouri env set KEY VAL    # persist environment variable
 ```
 
 The shell configuration file is detected based on the `SHELL` environment

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -28,6 +29,12 @@ func usage() {
 	fmt.Println("  gouri tree DIR           # show directory tree")
 	fmt.Println("  gouri create FILE        # create an empty file")
 	fmt.Println("  gouri lines FILE         # count lines in file")
+	fmt.Println("  gouri alias list         # list defined aliases")
+	fmt.Println("  gouri mkdir DIR          # create a directory")
+	fmt.Println("  gouri uptime             # show system uptime")
+	fmt.Println("  gouri edit FILE          # open file in $EDITOR")
+	fmt.Println("  gouri env KEY            # print environment variable")
+	fmt.Println("  gouri env set KEY VAL    # persist environment variable")
 }
 
 func runCommand(name string, args ...string) error {
@@ -165,6 +172,52 @@ func countLines(path string) error {
 	return nil
 }
 
+func listAliases() error {
+	data, err := os.ReadFile(shellConfig())
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "alias ") {
+			fmt.Println(line)
+		}
+	}
+	return scanner.Err()
+}
+
+func makeDir(path string) error {
+	return os.MkdirAll(path, 0755)
+}
+
+func showUptime() error {
+	return runCommand("uptime")
+}
+
+func editFile(path string) error {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = "nano"
+	}
+	return runCommand(editor, path)
+}
+
+func showEnv(key string) {
+	fmt.Println(os.Getenv(key))
+}
+
+func setEnv(key, value string) error {
+	file := shellConfig()
+	f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = fmt.Fprintf(f, "\nexport %s=%q\n", key, value)
+	return err
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -181,18 +234,30 @@ func main() {
 			fmt.Println("upgrade error:", err)
 		}
 	case "alias":
-		if len(os.Args) < 4 {
+		if len(os.Args) < 3 {
 			usage()
 			return
 		}
 		switch os.Args[2] {
 		case "add":
+			if len(os.Args) < 5 {
+				usage()
+				return
+			}
 			if err := addAlias(os.Args[3], strings.Join(os.Args[4:], " ")); err != nil {
 				fmt.Println("alias add error:", err)
 			}
 		case "remove":
+			if len(os.Args) < 4 {
+				usage()
+				return
+			}
 			if err := removeAlias(os.Args[3]); err != nil {
 				fmt.Println("alias remove error:", err)
+			}
+		case "list":
+			if err := listAliases(); err != nil {
+				fmt.Println("alias list error:", err)
 			}
 		default:
 			usage()
@@ -280,6 +345,43 @@ func main() {
 		}
 		if err := countLines(os.Args[2]); err != nil {
 			fmt.Println("lines error:", err)
+		}
+	case "mkdir":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := makeDir(os.Args[2]); err != nil {
+			fmt.Println("mkdir error:", err)
+		}
+	case "uptime":
+		if err := showUptime(); err != nil {
+			fmt.Println("uptime error:", err)
+		}
+	case "edit":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := editFile(os.Args[2]); err != nil {
+			fmt.Println("edit error:", err)
+		}
+	case "env":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		switch os.Args[2] {
+		case "set":
+			if len(os.Args) < 5 {
+				usage()
+				return
+			}
+			if err := setEnv(os.Args[3], os.Args[4]); err != nil {
+				fmt.Println("env set error:", err)
+			}
+		default:
+			showEnv(os.Args[2])
 		}
 	default:
 		usage()
