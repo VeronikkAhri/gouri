@@ -89,7 +89,7 @@ Example:
 
 ## Documentation
 
-Further information is available in the `docs` directory. Run `gouri manual` to see command details.
+Further information is available in the `docs` directory. Run `gouri manual` to see command details. The documentation includes a complete manual (`docs/manual.md`), instructions for extending the tool (`docs/extending.md`) and guidelines for contributors (`docs/contributing.md`).
 
 ## Notes
 
