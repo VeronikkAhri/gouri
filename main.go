@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -75,6 +76,9 @@ func usage() {
 	fmt.Println("  gouri tree DIR           # show directory tree")
 	fmt.Println("  gouri create FILE        # create an empty file")
 	fmt.Println("  gouri lines FILE         # count lines in file")
+	fmt.Println("  gouri head FILE [N]      # show first N lines")
+	fmt.Println("  gouri tail FILE [N]      # show last N lines")
+	fmt.Println("  gouri wc FILE            # count lines, words and bytes")
 	fmt.Println("  gouri alias list         # list defined aliases")
 	fmt.Println("  gouri mkdir DIR          # create a directory")
 	fmt.Println("  gouri uptime             # show system uptime")
@@ -83,6 +87,9 @@ func usage() {
 	fmt.Println("  gouri env set KEY VAL    # persist environment variable")
 	fmt.Println("  gouri free               # show memory usage")
 	fmt.Println("  gouri ps                 # list running processes")
+	fmt.Println("  gouri kill PID           # terminate a process")
+	fmt.Println("  gouri echo TEXT          # print text")
+	fmt.Println("  gouri cpuinfo            # show CPU information")
 	fmt.Println("  gouri compress OUT FILES # create a tar.gz archive")
 	fmt.Println("  gouri extract ARCH DIR   # extract a tar.gz archive")
 	fmt.Println("  gouri whoami             # show current user")
@@ -247,6 +254,57 @@ func countLines(path string) error {
 	return nil
 }
 
+func headFile(path string, n int) error {
+	if n <= 0 {
+		n = 10
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	count := 0
+	for scanner.Scan() {
+		fmt.Println(scanner.Text())
+		count++
+		if count >= n {
+			break
+		}
+	}
+	return scanner.Err()
+}
+
+func tailFile(path string, n int) error {
+	if n <= 0 {
+		n = 10
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	if n > len(lines) {
+		n = len(lines)
+	}
+	for _, line := range lines[len(lines)-n:] {
+		fmt.Println(line)
+	}
+	return nil
+}
+
+func wordCount(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	text := string(data)
+	lines := strings.Count(text, "\n")
+	words := len(strings.Fields(text))
+	fmt.Printf("%d %d %d\n", lines, words, len(data))
+	return nil
+}
+
 func listAliases() error {
 	data, err := os.ReadFile(shellConfig())
 	if err != nil {
@@ -335,6 +393,27 @@ func showNetwork() error {
 		return runCommand("Get-NetIPAddress")
 	}
 	return runCommand("ip", "addr")
+}
+
+func showCPUInfo() error {
+	if runtime.GOOS == "windows" {
+		return runCommand("Get-CimInstance", "Win32_Processor")
+	}
+	if _, err := os.Stat("/proc/cpuinfo"); err == nil {
+		return runCommand("cat", "/proc/cpuinfo")
+	}
+	return runCommand("lscpu")
+}
+
+func killProcess(pid string) error {
+	if runtime.GOOS == "windows" {
+		return runCommand("Stop-Process", "-Id", pid, "-Force")
+	}
+	return runCommand("kill", "-9", pid)
+}
+
+func echoText(text string) {
+	fmt.Println(text)
 }
 
 func showHostname() error {
@@ -467,12 +546,18 @@ Available commands:
   tree               show directory tree
   create             create an empty file
   lines              count lines in file
+  head               show first lines of file
+  tail               show last lines of file
+  wc                 count lines, words and bytes
   mkdir              create a directory
   uptime             show system uptime
   edit               open file in $EDITOR
   env                get or set environment variables
   free               show memory usage
   ps                 list running processes
+  kill               terminate a process
+  echo               print text
+  cpuinfo            show CPU information
   compress           create a tar.gz archive
   extract            extract a tar.gz archive
   whoami             show current user
@@ -646,6 +731,42 @@ func main() {
 		if err := countLines(os.Args[2]); err != nil {
 			fmt.Println("lines error:", err)
 		}
+	case "head":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		n := 10
+		if len(os.Args) >= 4 {
+			if v, err := strconv.Atoi(os.Args[3]); err == nil {
+				n = v
+			}
+		}
+		if err := headFile(os.Args[2], n); err != nil {
+			fmt.Println("head error:", err)
+		}
+	case "tail":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		n := 10
+		if len(os.Args) >= 4 {
+			if v, err := strconv.Atoi(os.Args[3]); err == nil {
+				n = v
+			}
+		}
+		if err := tailFile(os.Args[2], n); err != nil {
+			fmt.Println("tail error:", err)
+		}
+	case "wc":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := wordCount(os.Args[2]); err != nil {
+			fmt.Println("wc error:", err)
+		}
 	case "mkdir":
 		if len(os.Args) < 3 {
 			usage()
@@ -690,6 +811,24 @@ func main() {
 	case "ps":
 		if err := listProcesses(); err != nil {
 			fmt.Println("ps error:", err)
+		}
+	case "kill":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		if err := killProcess(os.Args[2]); err != nil {
+			fmt.Println("kill error:", err)
+		}
+	case "echo":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		echoText(strings.Join(os.Args[2:], " "))
+	case "cpuinfo":
+		if err := showCPUInfo(); err != nil {
+			fmt.Println("cpuinfo error:", err)
 		}
 	case "compress":
 		if len(os.Args) < 4 {

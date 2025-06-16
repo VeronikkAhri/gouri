@@ -31,6 +31,9 @@ go build
 ./gouri tree DIR           # show directory tree
 ./gouri create FILE        # create an empty file
 ./gouri lines FILE         # count lines in a file
+./gouri head FILE [N]      # show first N lines (default 10)
+./gouri tail FILE [N]      # show last N lines (default 10)
+./gouri wc FILE            # count lines, words and bytes
 ./gouri alias list         # list existing aliases
 ./gouri mkdir DIR          # create a directory
 ./gouri uptime             # show system uptime
@@ -39,6 +42,9 @@ go build
 ./gouri env set KEY VAL    # persist environment variable
 ./gouri free               # show memory usage
 ./gouri ps                 # list running processes
+./gouri kill PID           # terminate a process
+./gouri echo TEXT          # print text
+./gouri cpuinfo            # show CPU information
 ./gouri compress OUT FILES # create a tar.gz archive
 ./gouri extract ARCH DIR   # extract a tar.gz archive
 ./gouri whoami             # show current user
