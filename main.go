@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,46 @@ import (
 	"runtime"
 	"strings"
 )
+
+type Config struct {
+	Editor      string            `json:"editor,omitempty"`
+	ShellConfig string            `json:"shell_config,omitempty"`
+	Custom      map[string]string `json:"custom,omitempty"`
+}
+
+func configPath() string {
+	home := os.Getenv("HOME")
+	if home == "" {
+		if h, err := os.UserHomeDir(); err == nil {
+			home = h
+		}
+	}
+	return filepath.Join(home, ".gouri.json")
+}
+
+func loadConfig() (*Config, error) {
+	path := configPath()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &Config{}, nil
+		}
+		return nil, err
+	}
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func saveConfig(cfg *Config) error {
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath(), data, 0644)
+}
 
 func usage() {
 	fmt.Println("Gouri - simple assistant")
@@ -56,6 +97,9 @@ func usage() {
 	fmt.Println("  gouri checksum FILE      # SHA256 of FILE")
 	fmt.Println("  gouri sysinfo            # show OS and arch")
 	fmt.Println("  gouri clear              # clear the screen")
+	fmt.Println("  gouri config get KEY     # show config value")
+	fmt.Println("  gouri config set KEY VAL # set config value")
+	fmt.Println("  gouri config path        # print config location")
 }
 
 func runCommand(name string, args ...string) error {
@@ -72,6 +116,9 @@ func runCommand(name string, args ...string) error {
 }
 
 func shellConfig() string {
+	if cfg, err := loadConfig(); err == nil && cfg.ShellConfig != "" {
+		return cfg.ShellConfig
+	}
 	shell := os.Getenv("SHELL")
 	base := filepath.Base(shell)
 	switch base {
@@ -227,6 +274,9 @@ func showUptime() error {
 
 func editFile(path string) error {
 	editor := os.Getenv("EDITOR")
+	if cfg, err := loadConfig(); err == nil && cfg.Editor != "" {
+		editor = cfg.Editor
+	}
 	if editor == "" {
 		editor = "nano"
 	}
@@ -653,6 +703,57 @@ func main() {
 	case "clear":
 		if err := clearScreen(); err != nil {
 			fmt.Println("clear error:", err)
+		}
+	case "config":
+		if len(os.Args) < 3 {
+			usage()
+			return
+		}
+		cfg, err := loadConfig()
+		if err != nil {
+			fmt.Println("config error:", err)
+			return
+		}
+		switch os.Args[2] {
+		case "get":
+			if len(os.Args) < 4 {
+				usage()
+				return
+			}
+			key := os.Args[3]
+			switch key {
+			case "editor":
+				fmt.Println(cfg.Editor)
+			case "shell_config":
+				fmt.Println(cfg.ShellConfig)
+			default:
+				fmt.Println(cfg.Custom[key])
+			}
+		case "set":
+			if len(os.Args) < 5 {
+				usage()
+				return
+			}
+			key := os.Args[3]
+			val := os.Args[4]
+			switch key {
+			case "editor":
+				cfg.Editor = val
+			case "shell_config":
+				cfg.ShellConfig = val
+			default:
+				if cfg.Custom == nil {
+					cfg.Custom = make(map[string]string)
+				}
+				cfg.Custom[key] = val
+			}
+			if err := saveConfig(cfg); err != nil {
+				fmt.Println("config set error:", err)
+			}
+		case "path":
+			fmt.Println(configPath())
+		default:
+			usage()
 		}
 	default:
 		usage()

@@ -53,10 +53,26 @@ go build
 ./gouri checksum FILE      # SHA256 of FILE
 ./gouri sysinfo            # show OS and arch
 ./gouri clear              # clear the screen
+./gouri config get KEY     # show saved config value
+./gouri config set KEY VAL # set config value
+./gouri config path        # print config file location
 ```
 
 The shell configuration file is detected based on the `SHELL` environment
 variable. For `zsh` it uses `~/.zshrc` and defaults to `~/.bashrc`.
+
+Gouri stores customization options in `~/.gouri.json`. You can override the
+default editor or shell configuration file path using the config commands.
+Other custom keys may also be saved and retrieved for scripts.
+
+Example:
+
+```bash
+# set nano as the default editor
+./gouri config set editor nano
+# show the saved editor
+./gouri config get editor
+```
 
 ## Notes
 
