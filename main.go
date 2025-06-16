@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -102,6 +104,8 @@ func usage() {
 	fmt.Println("  gouri serve DIR PORT     # start http server")
 	fmt.Println("  gouri uuid               # generate a UUID")
 	fmt.Println("  gouri checksum FILE      # SHA256 of FILE")
+	fmt.Println("  gouri encrypt IN OUT PASS  # encrypt file with password")
+	fmt.Println("  gouri decrypt IN OUT PASS  # decrypt file with password")
 	fmt.Println("  gouri sysinfo            # show OS and arch")
 	fmt.Println("  gouri clear              # clear the screen")
 	fmt.Println("  gouri config get KEY     # show config value")
@@ -303,6 +307,48 @@ func wordCount(path string) error {
 	words := len(strings.Fields(text))
 	fmt.Printf("%d %d %d\n", lines, words, len(data))
 	return nil
+}
+
+func encryptFile(in, out, password string) error {
+	data, err := os.ReadFile(in)
+	if err != nil {
+		return err
+	}
+	key := sha256.Sum256([]byte(password))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return err
+	}
+	iv := make([]byte, aes.BlockSize)
+	if _, err := rand.Read(iv); err != nil {
+		return err
+	}
+	stream := cipher.NewCFBEncrypter(block, iv)
+	enc := make([]byte, len(data))
+	stream.XORKeyStream(enc, data)
+	outData := append(iv, enc...)
+	return os.WriteFile(out, outData, 0644)
+}
+
+func decryptFile(in, out, password string) error {
+	data, err := os.ReadFile(in)
+	if err != nil {
+		return err
+	}
+	if len(data) < aes.BlockSize {
+		return fmt.Errorf("ciphertext too short")
+	}
+	key := sha256.Sum256([]byte(password))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return err
+	}
+	iv := data[:aes.BlockSize]
+	enc := data[aes.BlockSize:]
+	stream := cipher.NewCFBDecrypter(block, iv)
+	dec := make([]byte, len(enc))
+	stream.XORKeyStream(dec, enc)
+	return os.WriteFile(out, dec, 0644)
 }
 
 func listAliases() error {
@@ -570,6 +616,8 @@ Available commands:
   serve              start http server
   uuid               generate a UUID
   checksum           SHA256 of a file
+  encrypt            encrypt a file with password
+  decrypt            decrypt a file with password
   sysinfo            show OS and architecture
   clear              clear the screen
   config             manage configuration values
@@ -912,6 +960,22 @@ func main() {
 		}
 		if err := checksumFile(os.Args[2]); err != nil {
 			fmt.Println("checksum error:", err)
+		}
+	case "encrypt":
+		if len(os.Args) < 5 {
+			usage()
+			return
+		}
+		if err := encryptFile(os.Args[2], os.Args[3], os.Args[4]); err != nil {
+			fmt.Println("encrypt error:", err)
+		}
+	case "decrypt":
+		if len(os.Args) < 5 {
+			usage()
+			return
+		}
+		if err := decryptFile(os.Args[2], os.Args[3], os.Args[4]); err != nil {
+			fmt.Println("decrypt error:", err)
 		}
 	case "sysinfo":
 		showSysInfo()

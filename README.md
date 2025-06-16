@@ -57,6 +57,8 @@ go build
 ./gouri serve DIR PORT     # start http server
 ./gouri uuid               # generate a UUID
 ./gouri checksum FILE      # SHA256 of FILE
+./gouri encrypt IN OUT PASS  # encrypt file with password
+./gouri decrypt IN OUT PASS  # decrypt file with password
 ./gouri sysinfo            # show OS and arch
 ./gouri clear              # clear the screen
 ./gouri config get KEY     # show saved config value
