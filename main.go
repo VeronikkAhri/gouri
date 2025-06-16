@@ -100,6 +100,7 @@ func usage() {
 	fmt.Println("  gouri config get KEY     # show config value")
 	fmt.Println("  gouri config set KEY VAL # set config value")
 	fmt.Println("  gouri config path        # print config location")
+	fmt.Println("  gouri manual             # show the full manual")
 }
 
 func runCommand(name string, args ...string) error {
@@ -413,11 +414,86 @@ func showSysInfo() {
 	fmt.Printf("%s %s\n", runtime.GOOS, runtime.GOARCH)
 }
 
+func showPwd() error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	fmt.Println(dir)
+	return nil
+}
+
+func showHistory() error {
+	if runtime.GOOS == "windows" {
+		return runCommand("Get-History")
+	}
+	file := os.Getenv("HISTFILE")
+	if file == "" {
+		file = filepath.Join(os.Getenv("HOME"), ".bash_history")
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	fmt.Print(string(data))
+	return nil
+}
+
 func clearScreen() error {
 	if runtime.GOOS == "windows" {
 		return runCommand("cls")
 	}
 	return runCommand("clear")
+}
+
+const manualText = `Gouri Manual
+
+Gouri is a simple terminal assistant that automates common shell tasks.
+
+Available commands:
+  update             run system update
+  upgrade            run system upgrade
+  alias add          create an alias
+  alias remove       remove an alias
+  alias list         list defined aliases
+  view               print file contents
+  remove             delete a file
+  list               list directory contents
+  copy               copy a file
+  move               move or rename a file
+  search             search term in file
+  disk               show disk usage
+  ping               ping a network host
+  tree               show directory tree
+  create             create an empty file
+  lines              count lines in file
+  mkdir              create a directory
+  uptime             show system uptime
+  edit               open file in $EDITOR
+  env                get or set environment variables
+  free               show memory usage
+  ps                 list running processes
+  compress           create a tar.gz archive
+  extract            extract a tar.gz archive
+  whoami             show current user
+  date               show date and time
+  net                show network interfaces
+  hostname           print host name
+  calc               evaluate expression
+  open               open file or directory
+  download           download URL to file
+  serve              start http server
+  uuid               generate a UUID
+  checksum           SHA256 of a file
+  sysinfo            show OS and architecture
+  clear              clear the screen
+  config             manage configuration values
+  pwd                print working directory
+  history            show shell history
+  manual             show this manual`
+
+func showManual() {
+	fmt.Println(manualText)
 }
 
 func main() {
@@ -700,6 +776,14 @@ func main() {
 		}
 	case "sysinfo":
 		showSysInfo()
+	case "pwd":
+		if err := showPwd(); err != nil {
+			fmt.Println("pwd error:", err)
+		}
+	case "history":
+		if err := showHistory(); err != nil {
+			fmt.Println("history error:", err)
+		}
 	case "clear":
 		if err := clearScreen(); err != nil {
 			fmt.Println("clear error:", err)
@@ -755,6 +839,8 @@ func main() {
 		default:
 			usage()
 		}
+	case "manual":
+		showManual()
 	default:
 		usage()
 	}

@@ -56,7 +56,12 @@ go build
 ./gouri config get KEY     # show saved config value
 ./gouri config set KEY VAL # set config value
 ./gouri config path        # print config file location
+./gouri pwd                # print working directory
+./gouri history            # show shell history
+./gouri manual             # show full manual
 ```
+
+Run `./gouri manual` to view extended documentation for all commands.
 
 The shell configuration file is detected based on the `SHELL` environment
 variable. For `zsh` it uses `~/.zshrc` and defaults to `~/.bashrc`.
