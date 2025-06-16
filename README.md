@@ -87,6 +87,10 @@ Example:
 ./gouri config get editor
 ```
 
+## Documentation
+
+Further information is available in the `docs` directory. Run `gouri manual` to see command details.
+
 ## Notes
 
 Administrative commands such as update and upgrade require `sudo` privileges.

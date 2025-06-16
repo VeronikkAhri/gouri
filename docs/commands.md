@@ -1,0 +1,54 @@
+# Commands
+
+This file summarizes the most common commands. Each entry includes a short
+explanation of what the command does.
+
+- `update` – run system package update.
+- `upgrade` – upgrade installed packages.
+- `alias add NAME CMD` – append an alias to your shell config.
+- `alias remove NAME` – remove an alias from your shell config.
+- `alias list` – show defined aliases.
+- `view FILE` – display the contents of a file.
+- `remove FILE` – delete a file.
+- `list DIR` – list directory contents.
+- `copy SRC DST` – copy a file.
+- `move SRC DST` – move or rename a file.
+- `search FILE TERM` – search for text inside a file.
+- `disk` – show disk usage.
+- `ping HOST` – ping a network host.
+- `tree DIR` – display a directory tree.
+- `create FILE` – create an empty file.
+- `lines FILE` – count lines in a file.
+- `head FILE [N]` – show the first `N` lines of a file.
+- `tail FILE [N]` – show the last `N` lines of a file.
+- `wc FILE` – print line, word and byte counts.
+- `mkdir DIR` – create a directory.
+- `uptime` – show system uptime.
+- `edit FILE` – open a file in your preferred editor.
+- `env KEY` – print an environment variable.
+- `env set KEY VAL` – set an environment variable in the shell config.
+- `free` – show memory usage.
+- `ps` – list running processes.
+- `kill PID` – terminate a process by ID.
+- `echo TEXT` – output text to the terminal.
+- `cpuinfo` – show CPU information.
+- `compress OUT FILES` – create a tar.gz archive.
+- `extract ARCH DIR` – extract a tar.gz archive.
+- `whoami` – display the current user.
+- `date` – show the date and time.
+- `net` – list network interfaces.
+- `hostname` – print the host name.
+- `calc EXPR` – evaluate a mathematical expression.
+- `open PATH` – open a file or directory.
+- `download URL FILE` – download a URL to a file.
+- `serve DIR PORT` – start a simple HTTP server.
+- `uuid` – generate a UUID.
+- `checksum FILE` – print a SHA256 checksum of a file.
+- `encrypt IN OUT PASS` – encrypt a file using a password.
+- `decrypt IN OUT PASS` – decrypt a file using a password.
+- `sysinfo` – show operating system and architecture.
+- `clear` – clear the terminal screen.
+- `config ...` – manage configuration values.
+- `pwd` – show the current directory.
+- `history` – print shell history.
+- `manual` – show the complete manual text.
